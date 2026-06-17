@@ -1,6 +1,6 @@
 /**
  * Webhook Alarm - Client-side application
- * Connects to SSE endpoint and plays alarm.wav when webhook is received
+ * Polls server for webhooks and plays alarm.wav when received
  */
 
 class WebhookAlarm {
