@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webhook Alarm</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s ease;
+        }
+
+        body.alarm-active {
+            background: #8b0000;
+            animation: flash 0.5s infinite alternate;
+        }
+
+        @keyframes flash {
+            from { background: #8b0000; }
+            to { background: #ff0000; }
+        }
+
+        .container {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .status {
+            font-size: 1.5rem;
+            margin: 1rem 0;
+            padding: 1rem;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .status.listening {
+            color: #00ff88;
+        }
+
+        .status.alarm {
+            color: #ff0000;
+            font-weight: bold;
+            font-size: 2rem;
+        }
+
+        .webhook-url {
+            margin: 1rem 0;
+            padding: 0.5rem 1rem;
+            background: #16213e;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #00ff88;
+        }
+
+        .controls {
+            margin-top: 2rem;
+        }
+
+        button {
+            padding: 1rem 2rem;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: #00ff88;
+            color: #1a1a2e;
+        }
+
+        .btn-primary:hover {
+            background: #00cc66;
+        }
+
+        .btn-danger {
+            background: #ff4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #cc0000;
+        }
+
+        .volume-control {
+            margin-top: 1rem;
+        }
+
+        .volume-control label {
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .log {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: #16213e;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            width: 100%;
+            max-width: 600px;
+            text-align: left;
+        }
+
+        .log-entry {
+            font-size: 0.9rem;
+            padding: 0.25rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 Webhook Alarm 🚨</h1>
+
+        <div class="status listening" id="status">
+            ⏳ Waiting for webhook...
+        </div>
+
+        <div class="webhook-url" id="webhookUrl">
+            Loading...
+        </div>
+
+        <div class="_buttons">
+            <button class="btn-primary" id="testBtn">Test Alarm</button>
+            <button class="btn-danger" id="stopBtn">Stop Alarm</button>
+        </div>
+
+        <div class="volume-control">
+            <label for="volume">Volume: <span id="volumeValue">100%</span></label>
+            <input type="range" id="volume" min="0" max="100" value="100">
+        </div>
+
+        <div class="log" id="log">
+            <div class="log-entry">System ready...</div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
