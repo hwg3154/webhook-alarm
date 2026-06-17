@@ -71,8 +71,13 @@ def alarm_wav():
 @app.route('/webhook', methods=['POST'])
 def webhook():
     """Receive webhook calls and broadcast to all connected clients."""
+    log.info(f"=== WEBHOOK REQUEST ===")
+    log.info(f"Headers: {dict(request.headers)}")
+    log.info(f"Raw data: {request.get_data()}")
+
     try:
         data = request.get_json(silent=True) or {}
+        log.info(f"Parsed JSON: {data}")
         message = data.get('message', 'Webhook received!')
 
         log.info(f"Webhook received: {message}")
@@ -98,11 +103,11 @@ def webhook():
                 log.info(f"Removed dead client {client_id[:8]}")
 
         result = jsonify({'status': 'success', 'message': 'Alarm triggered', 'clients_notified': len(clients)})
-        log.info(f"Webhook response: {result}")
+        log.info(f"Webhook response sent")
         return result, 200
 
     except Exception as e:
-        log.error(f"Webhook error: {e}")
+        log.error(f"Webhook error: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
