@@ -11,9 +11,22 @@ import time
 import uuid
 import threading
 import os
+import logging
+
+# Enable detailed logging for debugging
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)
+
+# Log all registered routes for debugging
+@app.before_first_request
+def log_routes():
+    log.info("=== Registered Routes ===")
+    for rule in app.url_map.iter_rules():
+        log.info(f"  {rule.methods} {rule.rule} -> {rule.endpoint}")
+    log.info("========================")
 
 # Store connected clients for SSE
 clients = {}
