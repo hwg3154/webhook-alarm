@@ -20,13 +20,15 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
-# Log all registered routes for debugging
-@app.before_first_request
+# Log all registered routes at startup
 def log_routes():
     log.info("=== Registered Routes ===")
     for rule in app.url_map.iter_rules():
         log.info(f"  {rule.methods} {rule.rule} -> {rule.endpoint}")
     log.info("========================")
+
+# Log routes after app initialization
+log_routes()
 
 # Store connected clients for SSE
 clients = {}
