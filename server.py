@@ -138,7 +138,7 @@ def sse():
 
 if __name__ == '__main__':
     import os
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 2292))
     print(f"Starting Webhook Alarm server on http://localhost:{port}")
     print(f"Webhook endpoint: http://localhost:{port}/webhook")
     print(f"SSE endpoint: http://localhost:{port}/sse")
