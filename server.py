@@ -75,6 +75,9 @@ def webhook():
         data = request.get_json(silent=True) or {}
         message = data.get('message', 'Webhook received!')
 
+        log.info(f"Webhook received: {message}")
+        log.info(f"Connected clients: {len(clients)}")
+
         # Broadcast to all connected clients
         dead_clients = []
         with clients_lock:
@@ -84,16 +87,22 @@ def webhook():
                         'message': message,
                         'timestamp': time.time()
                     })
-                except:
+                    log.info(f"Sent message to client {client_id[:8]}")
+                except Exception as e:
+                    log.warning(f"Failed to send to client {client_id[:8]}: {e}")
                     dead_clients.append(client_id)
 
             # Clean up dead clients
             for client_id in dead_clients:
                 del clients[client_id]
+                log.info(f"Removed dead client {client_id[:8]}")
 
-        return jsonify({'status': 'success', 'message': 'Alarm triggered', 'clients_notified': len(clients)}), 200
+        result = jsonify({'status': 'success', 'message': 'Alarm triggered', 'clients_notified': len(clients)})
+        log.info(f"Webhook response: {result}")
+        return result, 200
 
     except Exception as e:
+        log.error(f"Webhook error: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
@@ -104,22 +113,28 @@ def sse():
     import queue
     msg_queue = queue.Queue()
 
+    log.info(f"New SSE client connecting: {client_id[:8]}")
+
     with clients_lock:
         clients[client_id] = msg_queue
+        log.info(f"Client {client_id[:8]} registered. Total clients: {len(clients)}")
 
     def generate():
         try:
             while True:
                 try:
                     data = msg_queue.get(timeout=15)
+                    log.info(f"Sending message to client {client_id[:8]}")
                     yield f"data: {json.dumps(data)}\n\n"
                 except queue.Empty:
                     # Send ping more frequently to keep connection alive through proxies
                     yield f"data: {json.dumps({'ping': True})}\n\n"
         except GeneratorExit:
+            log.info(f"SSE client disconnected: {client_id[:8]}")
             with clients_lock:
                 if client_id in clients:
                     del clients[client_id]
+                    log.info(f"Client {client_id[:8]} removed. Total clients: {len(clients)}")
 
     return Response(
         generate(),
