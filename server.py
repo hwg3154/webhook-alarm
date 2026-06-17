@@ -96,9 +96,10 @@ def sse():
         try:
             while True:
                 try:
-                    data = msg_queue.get(timeout=30)
+                    data = msg_queue.get(timeout=15)
                     yield f"data: {json.dumps(data)}\n\n"
                 except queue.Empty:
+                    # Send ping more frequently to keep connection alive through proxies
                     yield f"data: {json.dumps({'ping': True})}\n\n"
         except GeneratorExit:
             with clients_lock:
@@ -109,10 +110,13 @@ def sse():
         generate(),
         mimetype='text/event-stream',
         headers={
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Cache-Control': 'no-cache, no-store, must-revalidate, no-transform',
             'Connection': 'keep-alive',
             'X-Accel-Buffering': 'no',
             'Content-Type': 'text/event-stream',
+            'Transfer-Encoding': 'chunked',
+            'Pragma': 'no-cache',
+            'Expires': '0',
         }
     )
 
@@ -122,4 +126,10 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"Starting Webhook Alarm server on http://localhost:{port}")
     print(f"Webhook endpoint: http://localhost:{port}/webhook")
-    app.run(host='0.0.0.0', port=port, debug=True, threaded=True)
+    print(f"SSE endpoint: http://localhost:{port}/sse")
+
+    # Disable debug mode for production (behind Cloudflare tunnel)
+    # Debug mode can cause SSE connection issues
+    debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
+
+    app.run(host='0.0.0.0', port=port, debug=debug_mode, threaded=True)

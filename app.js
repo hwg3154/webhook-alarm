@@ -46,6 +46,7 @@ class WebhookAlarm {
 
         this.eventSource.onopen = () => {
             this.log('✅ SSE connection established');
+            this.log(`Connection state: OPEN (${this.eventSource.readyState})`);
         };
 
         this.eventSource.onmessage = (event) => {
@@ -56,14 +57,17 @@ class WebhookAlarm {
         };
 
         this.eventSource.onerror = (err) => {
-            this.log(`❌ SSE error: ${err.type}`);
-            this.log('Retrying in 3 seconds...');
+            const state = this.eventSource.readyState;
+            let stateText = state === 0 ? 'CONNECTING' : state === 1 ? 'OPEN' : state === 2 ? 'CLOSED' : 'UNKNOWN';
+            this.log(`❌ SSE error: ${err.type} (readyState: ${stateText})`);
 
-            // Close the current connection
-            this.eventSource.close();
-
-            // Retry after delay
-            setTimeout(() => this.connectSSE(), 3000);
+            // Don't retry if permanently closed
+            if (state === 2) {
+                this.log('Connection permanently closed, restarting...');
+                setTimeout(() => this.connectSSE(), 3000);
+            } else {
+                this.log('Temporary error, will retry...');
+            }
         };
     }
 
