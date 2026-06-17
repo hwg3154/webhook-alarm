@@ -38,10 +38,14 @@ class WebhookAlarm {
 
     connectSSE() {
         const sseUrl = `${window.location.protocol}//${window.location.host}/sse`;
-        this.eventSource = new EventSource(sseUrl);
+
+        // Create EventSource with credentials for cross-origin scenarios
+        this.eventSource = new EventSource(sseUrl, {
+            withCredentials: false
+        });
 
         this.eventSource.onopen = () => {
-            this.log('SSE connection established');
+            this.log('✅ SSE connection established');
         };
 
         this.eventSource.onmessage = (event) => {
@@ -51,8 +55,14 @@ class WebhookAlarm {
             this.triggerAlarm(data.message || 'Webhook received!');
         };
 
-        this.eventSource.onerror = () => {
-            this.log('SSE connection lost, retrying...');
+        this.eventSource.onerror = (err) => {
+            this.log(`❌ SSE error: ${err.type}`);
+            this.log('Retrying in 3 seconds...');
+
+            // Close the current connection
+            this.eventSource.close();
+
+            // Retry after delay
             setTimeout(() => this.connectSSE(), 3000);
         };
     }

@@ -10,6 +10,7 @@ import json
 import time
 import uuid
 import threading
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -108,8 +109,10 @@ def sse():
         generate(),
         mimetype='text/event-stream',
         headers={
-            'Cache-Control': 'no-cache',
-            'X-Accel-Buffering': 'no'
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no',
+            'Content-Type': 'text/event-stream',
         }
     )
 
