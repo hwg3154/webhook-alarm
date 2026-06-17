@@ -8,6 +8,8 @@ class WebhookAlarm {
         this.audio = null;
         this.isPlaying = false;
         this.eventSource = null;
+        this.reconnectDelay = 1000;  // Start with 1 second
+        this.maxReconnectDelay = 5000;
 
         this.init();
     }
@@ -39,35 +41,41 @@ class WebhookAlarm {
     connectSSE() {
         const sseUrl = `${window.location.protocol}//${window.location.host}/sse`;
 
-        // Create EventSource with credentials for cross-origin scenarios
-        this.eventSource = new EventSource(sseUrl, {
-            withCredentials: false
-        });
+        this.log(`Connecting to SSE at ${sseUrl}...`);
+
+        // Create EventSource
+        this.eventSource = new EventSource(sseUrl);
 
         this.eventSource.onopen = () => {
             this.log('✅ SSE connection established');
-            this.log(`Connection state: OPEN (${this.eventSource.readyState})`);
+            this.reconnectDelay = 1000;  // Reset delay on successful connection
         };
 
         this.eventSource.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            if (data.ping) return; // Ignore ping messages
+            if (data.ping) {
+                this.log('📡 SSE ping received (connection alive)');
+                return;  // Ignore ping messages
+            }
 
+            this.log(`📨 SSE message received: ${data.message}`);
             this.triggerAlarm(data.message || 'Webhook received!');
         };
 
         this.eventSource.onerror = (err) => {
             const state = this.eventSource.readyState;
             let stateText = state === 0 ? 'CONNECTING' : state === 1 ? 'OPEN' : state === 2 ? 'CLOSED' : 'UNKNOWN';
-            this.log(`❌ SSE error: ${err.type} (readyState: ${stateText})`);
+            this.log(`❌ SSE connection lost (state: ${stateText})`);
 
-            // Don't retry if permanently closed
-            if (state === 2) {
-                this.log('Connection permanently closed, restarting...');
-                setTimeout(() => this.connectSSE(), 3000);
-            } else {
-                this.log('Temporary error, will retry...');
-            }
+            // Close the current connection explicitly
+            this.eventSource.close();
+
+            // Reconnect with exponential backoff
+            this.log(`⏳ Retrying in ${this.reconnectDelay}ms...`);
+            setTimeout(() => {
+                this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
+                this.connectSSE();
+            }, this.reconnectDelay);
         };
     }
 
