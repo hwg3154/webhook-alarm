@@ -63,6 +63,7 @@ def app_js():
 @app.route('/alarm.wav')
 def alarm_wav():
     """Serve the alarm audio file."""
+    log.info("Serving alarm.wav")
     wav_path = os.path.join(os.path.dirname(__file__), 'alarm.wav')
     with open(wav_path, 'rb') as f:
         return f.read(), 200, {'Content-Type': 'audio/wav'}
@@ -114,6 +115,8 @@ def webhook():
 @app.route('/sse')
 def sse():
     """Server-Sent Events endpoint for real-time updates."""
+    from flask import stream_with_context
+
     client_id = str(uuid.uuid4())
     import queue
     msg_queue = queue.Queue()
@@ -126,18 +129,17 @@ def sse():
 
     def generate():
         try:
-            while True:
-                # Send initial comment to force connection open
-                yield ": connected\n\n"
+            # Send initial connection event
+            yield ": connected\n\n"
 
-                while True:
-                    try:
-                        data = msg_queue.get(timeout=15)
-                        log.info(f"Sending message to client {client_id[:8]}")
-                        yield f"data: {json.dumps(data)}\n\n"
-                    except queue.Empty:
-                        # Send ping more frequently to keep connection alive through proxies
-                        yield ": ping\n\ndata: {json.dumps({'ping': True})}\n\n"
+            while True:
+                try:
+                    data = msg_queue.get(timeout=15)
+                    log.info(f"Sending message to client {client_id[:8]}")
+                    yield f"data: {json.dumps(data)}\n\n"
+                except queue.Empty:
+                    # Send ping to keep connection alive
+                    yield f"data: {json.dumps({'ping': True})}\n\n"
         except GeneratorExit:
             log.info(f"SSE client disconnected: {client_id[:8]}")
             with clients_lock:
@@ -146,7 +148,7 @@ def sse():
                     log.info(f"Client {client_id[:8]} removed. Total clients: {len(clients)}")
 
     return Response(
-        generate(),
+        stream_with_context(generate()),
         mimetype='text/event-stream',
         headers={
             'Cache-Control': 'no-cache, no-store, must-revalidate, no-transform',
@@ -156,7 +158,6 @@ def sse():
             'Transfer-Encoding': 'chunked',
             'Pragma': 'no-cache',
             'Expires': '0',
-            # Disable Cloudflare compression and caching
             'X-Content-Type-Options': 'nosniff',
         }
     )
