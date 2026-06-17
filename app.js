@@ -7,9 +7,8 @@ class WebhookAlarm {
     constructor() {
         this.audio = null;
         this.isPlaying = false;
-        this.eventSource = null;
-        this.reconnectDelay = 1000;  // Start with 1 second
-        this.maxReconnectDelay = 5000;
+        this.pollTimer = null;
+        this.lastMessageTime = 0;
 
         this.init();
     }
@@ -30,53 +29,49 @@ class WebhookAlarm {
             }
         });
 
-        // Connect to SSE
-        this.connectSSE();
+        // Start polling
+        this.startPolling();
 
         // Log startup
         this.log('Alarm system initialized and ready');
-        this.log('Connect to SSE and listening for webhooks...');
+        this.log('Polling for webhooks...');
     }
 
-    connectSSE() {
-        const sseUrl = `${window.location.protocol}//${window.location.host}/sse`;
+    startPolling() {
+        this.log('📡 Starting webhook polling...');
+        this.poll();
+    }
 
-        this.log(`Connecting to SSE at ${sseUrl}...`);
+    poll() {
+        const url = `${window.location.protocol}//${window.location.host}/poll?lastMessage=${this.lastMessageTime}`;
 
-        // Create EventSource
-        this.eventSource = new EventSource(sseUrl);
+        fetch(url)
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                this.log('📡 Poll response received');
 
-        this.eventSource.onopen = () => {
-            this.log('✅ SSE connection established');
-            this.reconnectDelay = 1000;  // Reset delay on successful connection
-        };
+                if (data.messages && data.messages.length > 0) {
+                    for (const msg of data.messages) {
+                        this.lastMessageTime = msg.timestamp;
+                        this.triggerAlarm(msg.message);
+                    }
+                }
 
-        this.eventSource.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.ping) {
-                this.log('📡 SSE ping received (connection alive)');
-                return;  // Ignore ping messages
-            }
+                // Continue polling
+                this.scheduleNextPoll();
+            })
+            .catch(err => {
+                this.log(`❌ Poll error: ${err.message}`);
+                this.scheduleNextPoll();
+            });
+    }
 
-            this.log(`📨 SSE message received: ${data.message}`);
-            this.triggerAlarm(data.message || 'Webhook received!');
-        };
-
-        this.eventSource.onerror = (err) => {
-            const state = this.eventSource.readyState;
-            let stateText = state === 0 ? 'CONNECTING' : state === 1 ? 'OPEN' : state === 2 ? 'CLOSED' : 'UNKNOWN';
-            this.log(`❌ SSE connection lost (state: ${stateText})`);
-
-            // Close the current connection explicitly
-            this.eventSource.close();
-
-            // Reconnect with exponential backoff
-            this.log(`⏳ Retrying in ${this.reconnectDelay}ms...`);
-            setTimeout(() => {
-                this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
-                this.connectSSE();
-            }, this.reconnectDelay);
-        };
+    scheduleNextPoll() {
+        if (this.pollTimer) clearTimeout(this.pollTimer);
+        this.pollTimer = setTimeout(() => this.poll(), 2000);
     }
 
     playAlarm() {

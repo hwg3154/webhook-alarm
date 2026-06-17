@@ -34,6 +34,24 @@ log_routes()
 clients = {}
 clients_lock = threading.Lock()
 
+# Message history for polling clients
+message_history = []
+HISTORY_MAX = 100
+history_lock = threading.Lock()
+
+
+def add_to_history(message):
+    """Add a message to the history for polling clients."""
+    with history_lock:
+        msg = {
+            'message': message,
+            'timestamp': time.time()
+        }
+        message_history.append(msg)
+        # Keep only last N messages
+        while len(message_history) > HISTORY_MAX:
+            message_history.pop(0)
+
 
 def event_stream(client_id):
     """Generate SSE events for a specific client."""
@@ -82,9 +100,11 @@ def webhook():
         message = data.get('message', 'Webhook received!')
 
         log.info(f"Webhook received: {message}")
-        log.info(f"Connected clients: {len(clients)}")
 
-        # Broadcast to all connected clients
+        # Add to message history for polling clients
+        add_to_history(message)
+
+        # Broadcast to all connected SSE clients
         dead_clients = []
         with clients_lock:
             for client_id, queue in list(clients.items()):
@@ -103,7 +123,7 @@ def webhook():
                 del clients[client_id]
                 log.info(f"Removed dead client {client_id[:8]}")
 
-        result = jsonify({'status': 'success', 'message': 'Alarm triggered', 'clients_notified': len(clients)})
+        result = jsonify({'status': 'success', 'message': 'Alarm triggered', 'clients_notified': len(clients), 'history_count': len(message_history)})
         log.info(f"Webhook response sent")
         return result, 200
 
@@ -161,6 +181,23 @@ def sse():
             'X-Content-Type-Options': 'nosniff',
         }
     )
+
+
+@app.route('/poll', methods=['GET'])
+def poll():
+    """Polling endpoint for clients that can't use SSE."""
+    last_message_time = request.args.get('lastMessage', '0')
+    try:
+        last_message_time = float(last_message_time)
+    except (ValueError, TypeError):
+        last_message_time = 0
+
+    with history_lock:
+        # Return messages newer than last_message_time
+        new_messages = [m for m in message_history if m['timestamp'] > last_message_time]
+
+    log.info(f"Poll request: lastMessage={last_message_time}, returning {len(new_messages)} messages")
+    return jsonify({'messages': new_messages}), 200
 
 
 if __name__ == '__main__':
