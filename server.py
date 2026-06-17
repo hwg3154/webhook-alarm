@@ -127,13 +127,17 @@ def sse():
     def generate():
         try:
             while True:
-                try:
-                    data = msg_queue.get(timeout=15)
-                    log.info(f"Sending message to client {client_id[:8]}")
-                    yield f"data: {json.dumps(data)}\n\n"
-                except queue.Empty:
-                    # Send ping more frequently to keep connection alive through proxies
-                    yield f"data: {json.dumps({'ping': True})}\n\n"
+                # Send initial comment to force connection open
+                yield ": connected\n\n"
+
+                while True:
+                    try:
+                        data = msg_queue.get(timeout=15)
+                        log.info(f"Sending message to client {client_id[:8]}")
+                        yield f"data: {json.dumps(data)}\n\n"
+                    except queue.Empty:
+                        # Send ping more frequently to keep connection alive through proxies
+                        yield ": ping\n\ndata: {json.dumps({'ping': True})}\n\n"
         except GeneratorExit:
             log.info(f"SSE client disconnected: {client_id[:8]}")
             with clients_lock:
@@ -152,6 +156,8 @@ def sse():
             'Transfer-Encoding': 'chunked',
             'Pragma': 'no-cache',
             'Expires': '0',
+            # Disable Cloudflare compression and caching
+            'X-Content-Type-Options': 'nosniff',
         }
     )
 
